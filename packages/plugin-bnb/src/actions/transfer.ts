@@ -128,7 +128,7 @@ export class TransferAction {
 
             return resp;
         } catch (error) {
-            throw new Error(`Transfer failed: ${error.message}`);
+            throw error;
         }
     }
 

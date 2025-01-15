@@ -64,7 +64,7 @@ export class SwapAction {
 
             return resp;
         } catch (error) {
-            throw new Error(`Swap failed: ${error.message}`);
+            throw error;
         }
     }
 

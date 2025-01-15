@@ -75,7 +75,7 @@ export class GetBalanceAction {
 
             return resp;
         } catch (error) {
-            throw new Error(`Get balance failed: ${error.message}`);
+            throw error;
         }
     }
 

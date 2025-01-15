@@ -47,7 +47,7 @@ export class StakeAction {
             const resp = await actions[params.action]();
             return { response: resp };
         } catch (error) {
-            throw new Error(`Stake failed: ${error.message}`);
+            throw error;
         }
     }
 

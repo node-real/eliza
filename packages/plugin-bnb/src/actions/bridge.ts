@@ -270,7 +270,7 @@ export class BridgeAction {
 
             return resp;
         } catch (error) {
-            throw new Error(`Bridge failed: ${error.message}`);
+            throw error;
         }
     }
 
@@ -318,8 +318,10 @@ export class BridgeAction {
                 args: [spender, amount - allowance],
             });
 
-            await walletClient.writeContract(request);
-            await new Promise((resolve) => setTimeout(resolve, 3000)); // wait for the transaction to be confirmed
+            const hash = await walletClient.writeContract(request);
+            await publicClient.waitForTransactionReceipt({
+                hash,
+            });
         }
     }
 }
