@@ -13,7 +13,11 @@ import WebSocket, { ClientOptions } from "ws";
 
 import { faucetTemplate } from "../templates";
 import { FaucetResponse, type FaucetParams } from "../types";
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
+import {
+    bnbWalletProvider,
+    initWalletProvider,
+    WalletProvider,
+} from "../providers/wallet";
 
 export { faucetTemplate };
 
@@ -135,6 +139,7 @@ export const faucetAction = {
         } else {
             state = await runtime.updateRecentMessageState(state);
         }
+        state.walletInfo = await bnbWalletProvider.get(runtime, message, state);
 
         // Compose faucet context
         const faucetContext = composeContext({

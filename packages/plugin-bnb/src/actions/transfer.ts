@@ -16,7 +16,11 @@ import {
     type Hex,
 } from "viem";
 
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
+import {
+    bnbWalletProvider,
+    initWalletProvider,
+    WalletProvider,
+} from "../providers/wallet";
 import { transferTemplate } from "../templates";
 import { ERC20Abi, type TransferParams, type TransferResponse } from "../types";
 
@@ -83,17 +87,10 @@ export class TransferAction {
                 // ERC20 token transfer
                 let tokenAddress = params.token;
                 if (!params.token.startsWith("0x")) {
-                    const resolvedAddress =
-                        await this.walletProvider.getTokenAddress(
-                            params.chain,
-                            params.token
-                        );
-                    if (!resolvedAddress) {
-                        throw new Error(
-                            `Unknown token symbol ${params.token}. Please provide a valid token address.`
-                        );
-                    }
-                    tokenAddress = resolvedAddress;
+                    tokenAddress = await this.walletProvider.getTokenAddress(
+                        params.chain,
+                        params.token
+                    );
                 }
 
                 const publicClient = this.walletProvider.getPublicClient(
@@ -125,6 +122,18 @@ export class TransferAction {
                     value
                 );
             }
+
+            if (!resp.txHash || resp.txHash == "0x") {
+                throw new Error("Get transaction hash failed");
+            }
+
+            // wait for the transaction to be confirmed
+            const publicClient = this.walletProvider.getPublicClient(
+                params.chain
+            );
+            await publicClient.waitForTransactionReceipt({
+                hash: resp.txHash,
+            });
 
             return resp;
         } catch (error) {
@@ -169,6 +178,7 @@ export const transferAction = {
         } else {
             state = await runtime.updateRecentMessageState(state);
         }
+        state.walletInfo = await bnbWalletProvider.get(runtime, message, state);
 
         // Compose transfer context
         const transferContext = composeContext({

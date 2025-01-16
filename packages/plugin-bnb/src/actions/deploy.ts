@@ -9,8 +9,12 @@ import {
     type State,
 } from "@elizaos/core";
 import solc from "solc";
-import { Abi, Address, formatEther, formatUnits, parseUnits } from "viem";
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
+import { Abi, Address, formatEther, parseUnits } from "viem";
+import {
+    bnbWalletProvider,
+    initWalletProvider,
+    WalletProvider,
+} from "../providers/wallet";
 import { ercContractTemplate } from "../templates";
 import {
     IDeployERC1155Params,
@@ -174,16 +178,6 @@ export class DeployAction {
 
         this.walletProvider.switchChain(chain);
 
-        // check wallet balance
-        const publicClient = this.walletProvider.getPublicClient(chain);
-        const balance = await publicClient.getBalance({
-            address: this.walletProvider.getAddress(),
-        });
-        elizaLogger.debug(`Wallet balance: ${formatEther(balance)} BNB`);
-        if (balance === 0n) {
-            elizaLogger.error("Wallet has no BNB for gas fees");
-        }
-
         const chainConfig = this.walletProvider.getChainConfigs(chain);
         const walletClient = this.walletProvider.getWalletClient(chain);
         const hash = await walletClient.deployContract({
@@ -195,6 +189,7 @@ export class DeployAction {
         });
 
         elizaLogger.debug("Waiting for deployment transaction...", hash);
+        const publicClient = this.walletProvider.getPublicClient(chain);
         const receipt = await publicClient.waitForTransactionReceipt({
             hash,
         });
@@ -223,6 +218,7 @@ export const deployAction = {
         } else {
             state = await runtime.updateRecentMessageState(state);
         }
+        state.walletInfo = await bnbWalletProvider.get(runtime, message, state);
 
         // Compose context
         const context = composeContext({
@@ -302,15 +298,19 @@ export const deployAction = {
                     action: "DEPLOY_TOKEN",
                 },
             },
+        ],
+        [
             {
-                user: "{{user2}}",
+                user: "{{user1}}",
                 content: {
                     text: "Deploy an ERC721 NFT contract with name 'MyNFT', symbol 'MNFT', baseURI 'https://my-nft-base-uri.com'",
                     action: "DEPLOY_TOKEN",
                 },
             },
+        ],
+        [
             {
-                user: "{{user3}}",
+                user: "{{user1}}",
                 content: {
                     text: "Deploy an ERC1155 contract with name 'My1155', baseURI 'https://my-1155-base-uri.com'",
                     action: "DEPLOY_TOKEN",

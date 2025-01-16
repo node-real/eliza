@@ -41,6 +41,7 @@ export interface BridgeParams {
 }
 
 export interface StakeParams {
+    chain: SupportedChain;
     action: StakeAction;
     amount?: string;
 }

@@ -11,7 +11,11 @@ import {
 import { executeRoute, getRoutes } from "@lifi/sdk";
 import { parseEther } from "viem";
 
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
+import {
+    bnbWalletProvider,
+    initWalletProvider,
+    WalletProvider,
+} from "../providers/wallet";
 import { swapTemplate } from "../templates";
 import type { SwapParams, SwapResponse } from "../types";
 
@@ -54,7 +58,10 @@ export class SwapAction {
             if (!routes.routes.length) throw new Error("No routes found");
 
             const execution = await executeRoute(routes.routes[0]);
-            const process = execution.steps[0]?.execution?.process[0];
+            const process =
+                execution.steps[0]?.execution?.process[
+                    execution.steps[0]?.execution?.process.length - 1
+                ];
 
             if (!process?.status || process.status === "FAILED") {
                 throw new Error("Transaction failed");
@@ -93,6 +100,7 @@ export const swapAction = {
         } else {
             state = await runtime.updateRecentMessageState(state);
         }
+        state.walletInfo = await bnbWalletProvider.get(runtime, message, state);
 
         // Compose swap context
         const swapContext = composeContext({

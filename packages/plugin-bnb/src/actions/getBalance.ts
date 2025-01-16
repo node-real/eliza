@@ -8,18 +8,21 @@ import {
     type Memory,
     type State,
 } from "@elizaos/core";
-import {
-    getTokens,
-    getToken,
-    getTokenBalance,
-    getTokenBalances,
-    ChainId,
-} from "@lifi/sdk";
+import { getToken, getTokens, getTokenBalances, ChainId } from "@lifi/sdk";
 
-import { initWalletProvider, WalletProvider } from "../providers/wallet";
+import {
+    bnbWalletProvider,
+    initWalletProvider,
+    WalletProvider,
+} from "../providers/wallet";
 import { getBalanceTemplate } from "../templates";
-import type { Balance, GetBalanceParams, GetBalanceResponse } from "../types";
-import { Address, formatEther, formatUnits } from "viem";
+import type {
+    Balance,
+    GetBalanceParams,
+    GetBalanceResponse,
+    SupportedChain,
+} from "../types";
+import { Address, erc20Abi, formatEther, formatUnits } from "viem";
 
 export { getBalanceTemplate };
 
@@ -48,17 +51,30 @@ export class GetBalanceAction {
 
             // If no specific token is requested, get all token balances
             if (!token) {
+                this.walletProvider.configureLiFiSdk(chain);
                 const balances = await this.getTokenBalances(chainId, address!);
                 resp.balances = balances;
             } else {
                 // If specific token is requested and it's not the native token
-                if (token !== nativeSymbol) {
-                    const balance = await this.getERC20TokenBalance(
-                        chainId,
-                        address!,
-                        token!
-                    );
-                    resp.balances = [{ token: token!, balance }];
+                if (token.toLowerCase() !== nativeSymbol.toLowerCase()) {
+                    let balance: string;
+                    if (token.startsWith("0x")) {
+                        balance = await this.getERC20TokenBalance(
+                            chain,
+                            address!,
+                            token as `0x${string}`
+                        );
+                    } else {
+                        this.walletProvider.configureLiFiSdk(chain);
+                        const tokenInfo = await getToken(chainId, token);
+                        balance = await this.getERC20TokenBalance(
+                            chain,
+                            address!,
+                            tokenInfo.address as `0x${string}`
+                        );
+                    }
+
+                    resp.balances = [{ token, balance }];
                 } else {
                     // If native token is requested
                     const nativeBalanceWei = await this.walletProvider
@@ -80,13 +96,26 @@ export class GetBalanceAction {
     }
 
     async getERC20TokenBalance(
-        chainId: ChainId,
+        chain: SupportedChain,
         address: Address,
-        tokenSymbol: string
+        tokenAddress: Address
     ): Promise<string> {
-        const token = await getToken(chainId, tokenSymbol);
-        const tokenBalance = await getTokenBalance(address, token);
-        return formatUnits(tokenBalance?.amount ?? 0n, token.decimals);
+        const publicClient = this.walletProvider.getPublicClient(chain);
+
+        const balance = await publicClient.readContract({
+            address: tokenAddress,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [address],
+        });
+
+        const decimals = await publicClient.readContract({
+            address: tokenAddress,
+            abi: erc20Abi,
+            functionName: "decimals",
+        });
+
+        return formatUnits(balance, decimals);
     }
 
     async getTokenBalances(
@@ -115,7 +144,12 @@ export class GetBalanceAction {
         }
 
         if (params.chain != "bsc") {
-            throw new Error("Only BSC mainnet is supported");
+            // if token contract address is not provided, only BSC mainnet is supported
+            if (!(params.token && params.token.startsWith("0x"))) {
+                throw new Error(
+                    "If token contract address is not provided, only BSC mainnet is supported"
+                );
+            }
         }
     }
 }
@@ -138,6 +172,7 @@ export const getBalanceAction = {
         } else {
             state = await runtime.updateRecentMessageState(state);
         }
+        state.walletInfo = await bnbWalletProvider.get(runtime, message, state);
 
         // Compose swap context
         const getBalanceContext = composeContext({
